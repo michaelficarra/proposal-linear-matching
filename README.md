@@ -9,7 +9,7 @@ A [JavaScript proposal](https://github.com/tc39/proposals) to provide RegExp mat
 
 ## Motivation
 
-Due to the use of a backtracking strategy in the RegExp engines embedded in all modern JavaScript engines, performing a RegExp match can be a dangerous operation. In these engines, depending on the pattern, the match operation may never complete, causing the program to enter an unrecoverable error state. Programs where this condition can be induced through user or environmental inputs are said to be vulnerable to [ReDoS](https://en.wikipedia.org/wiki/ReDoS). ReDoS vulnerabilities have been [highly prevalent in the JavaScript ecosystem for years](https://dl.acm.org/doi/abs/10.1145/3236024.3236027). From January to May 2026, ReDoS vulnerabilities in JavaScript libraries have [resulted in a CVE every 2.7 days](https://www.cve.org/CVERecord/SearchResults?query=CWE-1333). Current mitigation strategies are often either too costly, too limiting, or inadequate.
+Due to the use of a backtracking strategy in the RegExp engines embedded in all modern JavaScript engines, performing a RegExp match can be a dangerous operation. In these engines, depending on the pattern, the match operation may (practically) never complete, causing the program to enter an unrecoverable error state. Programs where this condition can be induced through user or environmental inputs are said to be vulnerable to [ReDoS](https://en.wikipedia.org/wiki/ReDoS). ReDoS vulnerabilities have been [highly prevalent in the JavaScript ecosystem for years](https://dl.acm.org/doi/abs/10.1145/3236024.3236027). From January to May 2026, ReDoS vulnerabilities have [resulted in a CVE every 2.7 days](https://www.cve.org/CVERecord/SearchResults?query=CWE-1333). Current mitigation strategies are often either too costly, too limiting, or inadequate.
 
 ## Presentations to Committee
 
@@ -21,17 +21,17 @@ We should provide solutions for the following use cases:
 
 1. A programmer wants to match using a pattern that was derived from an untrusted source such as user input or a function that generates patterns dynamically.
 1. A programmer wants to match using a fixed pattern against untrusted user input.
-1. A programmer wants to provide fallback behaviour in the case that a pattern is unable to be matched in a reasonable amount of time for the given input instead of trying to run a match that may never complete.
+1. A programmer wants to provide fallback behaviour in the case that a pattern is unable to be matched in a reasonable amount of time for the given input instead of trying to run a match that may (practically) never complete.
 1. A pattern producer wants to ensure that naïve consumers use a linear matching strategy for that pattern.
 
 ## Considered Design Space
 
 As this is an early stage proposal, the design space is still very open. But we have thought through some possible components of a solution that may be proposed at a later stage.
 
-### "linear matching is possible" indicator
+### an indicator that a linear implementation will be used for matching
 
 ```js
-if (re.canMatchLinearly) {
+if (re.willMatchlinearly) {
   re.exec(...);
 } else {
   // fallback behaviour
@@ -66,7 +66,7 @@ A new RegExp `l` flag could be used both to indicate to `exec` that a linear mat
 let match = re.exec(input, 10e3);
 ```
 
-Some way for the programmer to communicate that a backtracking implementation should be used until some kind of resource exhaustion, at which point a linear implementation should be used.
+Some way for the programmer to communicate that a backtracking implementation should be used until some kind of resource exhaustion, at which point a linear implementation should be used. Alternatively, the operation could throwan error that indicates resource exhaustion and the programmer could provide the fallback behaviour.
 
 ## Prior Art
 
@@ -75,6 +75,7 @@ Some way for the programmer to communicate that a backtracking implementation sh
 - Ruby: [selective memoisation strategy](https://ieeexplore.ieee.org/document/9519427) and [`Regexp.linear_time?`](https://docs.ruby-lang.org/en/3.2/Regexp.html#method-c-linear_time-3F) predicate
 - Rust: [`regex` crate](https://crates.io/crates/regex) omits features with no known linear implementation
 - C++ and others: the [RE2](https://github.com/google/re2) library has wrappers available for node.js, OCaml, WebAssembly, etc.
+- .NET languages: [`RegexOptions.NonBacktracking`](https://learn.microsoft.com/en-us/dotnet/standard/base-types/regular-expression-options#nonbacktracking-mode) opts a RegExp into a linear matching strategy
 - Go: [`regexp` package](https://pkg.go.dev/regexp) omits features with no known linear implementation
 
 ### JS libraries
@@ -89,3 +90,9 @@ Some way for the programmer to communicate that a backtracking implementation sh
 - https://v8.dev/blog/non-backtracking-regexp
 - V8 flag `--enable-experimental-regexp-engine`
 - Incomplete and unmaintained
+
+## FAQ
+
+### Why don't we just require linearity whenever possible?
+
+While it may sound appealing to limit worst-case complexity for all RegExps where it is possible to do so, this may actually have an unacceptable negative impact on most RegExp matches. Although backtracking implementations have very bad worst-case complexity, in typical cases, they will outperform linear implementations, especially newer, less-optimised linear implementations.
